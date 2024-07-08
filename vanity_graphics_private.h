@@ -2,6 +2,8 @@
 #define VANITY_GRAPHICS_H
 
 #include "volk.h"
+#include <SDL2/SDL.h>
+
 typedef struct VGImage {
   VkImage img;
   VkDeviceMemory mem;
@@ -13,6 +15,11 @@ typedef struct VGBuffer {
   VkDeviceMemory mem;
   size_t size;
 } VGBuffer;
+
+typedef struct VGPipeline {
+  VkPipelineLayout layout;
+  VkPipeline pipeline;
+} VGPipeline;
 
 typedef struct VGWindow {
   // Fundamental objects
@@ -46,17 +53,19 @@ typedef struct VGWindow {
   VkSwapchainKHR swapchain;
   
   uint32_t num_swapimages;
+  VkImage * swapimages;
   VkImageView * swapviews;
 
   VGImage primary_frameimage;
 
-  VkFramebuffer * framebuffers;
+  VkFramebuffer primary_framebuffer;
+
 } VGWindow;
 
 int VG_Init();
 void VG_Quit();
 
-VGWindow * VG_CreateWindow();
+VGWindow * VG_CreateWindow(int w, int h);
 void VG_DestroyWindow(VGWindow * wind);
 
 void VG_WaitIdle(VGWindow * wind);
@@ -71,5 +80,7 @@ void VG_DestroyBuffer(VGWindow * wind, VGBuffer buf);
 
 VGImage VG_CreateImageImpl(VGWindow * wind, uint32_t w, uint32_t h, uint32_t levels, VkSampleCountFlagBits num_samples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags props);
 void VG_DestroyImage(VGWindow * wind, VGImage img);
+
+void VG_DestroyPipeline(VGWindow * wind, VGPipeline pipe);
 
 #endif

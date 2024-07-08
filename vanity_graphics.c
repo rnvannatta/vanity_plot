@@ -180,9 +180,9 @@ QueriedDevice VG_SelectPhysicalDevice(VGWindow * wind) {
   return ret;
 }
 
-VGWindow * VG_CreateWindow() {
+VGWindow * VG_CreateWindow(int w, int h) {
   VGWindow * wind = malloc(sizeof(VGWindow));
-  wind->window = SDL_CreateWindow("such vulkan much wow", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 800, 600, SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+  wind->window = SDL_CreateWindow("such vulkan much wow", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
   uint32_t sdlExtensionCount;
   SDL_Vulkan_GetInstanceExtensions(wind->window, &sdlExtensionCount, NULL);
@@ -345,16 +345,6 @@ int VG_CreateAppObjects(VGWindow * wind) {
         .initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
       },
-      [1] = {
-        .format = wind->swapformat.format,
-        .samples = VK_SAMPLE_COUNT_1_BIT,
-        .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-        .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-    },
     };
 
     VkAttachmentReference colorRef = {
@@ -362,16 +352,10 @@ int VG_CreateAppObjects(VGWindow * wind) {
       .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     };
 
-    VkAttachmentReference resolveRef = {
-      .attachment = 1,
-      .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    };
-
     VkSubpassDescription subpass = {
       .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
       .colorAttachmentCount = 1,
       .pColorAttachments = &colorRef,
-      .pResolveAttachments = &resolveRef,
     };
 
     VkSubpassDependency subpass_dependency = {
@@ -433,7 +417,6 @@ int VG_CreateAppObjects(VGWindow * wind) {
   return 0;
 }
 
-// what the hell is this method
 static uint32_t VG_FindMemoryType(VGWindow * wind, uint32_t filter, VkMemoryPropertyFlags properties) {
   VkPhysicalDeviceMemoryProperties memProperties;
   vkGetPhysicalDeviceMemoryProperties(wind->physical_device, &memProperties);
@@ -536,8 +519,13 @@ VGBuffer VG_CreateBufferImpl(VGWindow * wind, VkDeviceSize size, VkBufferUsageFl
   return ret;
 }
 
+void VG_DestroyBuffer(VGWindow * wind, VGBuffer buf) {
+  vkDestroyBuffer(wind->device, buf.buf, NULL);
+  vkFreeMemory(wind->device, buf.mem, NULL);
+}
+
 VGImage Create_PrimaryFrameimage(VGWindow * wind) {
-  VGImage img = VG_CreateImageImpl(wind, wind->swap_extent.width, wind->swap_extent.height, 1, wind->msaa_samples, wind->swapformat.format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  VGImage img = VG_CreateImageImpl(wind, wind->swap_extent.width, wind->swap_extent.height, 1, wind->msaa_samples, wind->swapformat.format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
   return img;
 }
 
@@ -571,7 +559,7 @@ int VG_CreateSwapchain(VGWindow * wind) {
     .imageColorSpace = wind->swapformat.colorSpace,
     .imageExtent = swap_extent,
     .imageArrayLayers = 1,
-    .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    .imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
     .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
     .preTransform = surface_caps.currentTransform,
     .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
@@ -594,14 +582,14 @@ int VG_CreateSwapchain(VGWindow * wind) {
 
   vkGetSwapchainImagesKHR(wind->device, wind->swapchain, &swapImageCount, NULL);
   wind->num_swapimages = swapImageCount;
-  VkImage swapimages[swapImageCount];
-  vkGetSwapchainImagesKHR(wind->device, wind->swapchain, &swapImageCount, swapimages);
+  wind->swapimages = malloc(sizeof(VkImage[swapImageCount]));
+  vkGetSwapchainImagesKHR(wind->device, wind->swapchain, &swapImageCount, wind->swapimages);
 
   wind->swapviews = malloc(sizeof(VkImageView[swapImageCount]));
   for(int i = 0; i < swapImageCount; i++) {
     VkImageViewCreateInfo createInfo = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-      .image = swapimages[i],
+      .image = wind->swapimages[i],
       .viewType = VK_IMAGE_VIEW_TYPE_2D,
       .format = wind->swapformat.format,
       .components = {
@@ -626,11 +614,9 @@ int VG_CreateSwapchain(VGWindow * wind) {
 
   wind->primary_frameimage = Create_PrimaryFrameimage(wind);
 
-  wind->framebuffers = malloc(sizeof(VkFramebuffer[swapImageCount]));
-  for(int i = 0; i < swapImageCount; i++) {
+  {
     VkImageView attachments[] = {
       wind->primary_frameimage.view,
-      wind->swapviews[i],
     };
     VkFramebufferCreateInfo createInfo = {
       .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -641,7 +627,7 @@ int VG_CreateSwapchain(VGWindow * wind) {
       .height = swap_extent.height,
       .layers = 1,
     };
-    if(vkCreateFramebuffer(wind->device, &createInfo, NULL, &wind->framebuffers[i]) != VK_SUCCESS) {
+    if(vkCreateFramebuffer(wind->device, &createInfo, NULL, &wind->primary_framebuffer) != VK_SUCCESS) {
       fprintf(stderr, "failed to create swapchain framebuffer\n");
       return 1;
     }
@@ -654,9 +640,9 @@ void VG_DestroySwapchain(VGWindow * wind) {
   VkDevice device = wind->device;
   vkDeviceWaitIdle(device);
 
+  vkDestroyFramebuffer(device, wind->primary_framebuffer, NULL);
   for(int i = 0; i < wind->num_swapimages; i++)
   {
-    vkDestroyFramebuffer(device, wind->framebuffers[i], NULL);
     vkDestroyImageView(device, wind->swapviews[i], NULL);
   }
   VG_DestroyImage(wind, wind->primary_frameimage);
@@ -699,9 +685,14 @@ void VG_DestroyWindow(VGWindow * wind) {
 
   SDL_DestroyWindow(wind->window);
 
-  free(wind->framebuffers);
   free(wind->swapviews);
+  free(wind->swapimages);
   free(wind);
+}
+
+void VG_DestroyPipeline(VGWindow * wind, VGPipeline pipe) {
+  vkDestroyPipeline(wind->device, pipe.pipeline, NULL);
+  vkDestroyPipelineLayout(wind->device, pipe.layout, NULL);
 }
 
 void VG_Quit() {

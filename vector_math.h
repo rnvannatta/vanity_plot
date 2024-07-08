@@ -555,7 +555,7 @@ static inline vec2 vec3_swizzle_2(vec3 v, vec_index x, vec_index y) {
 }
 /* last args are imm */
 static inline float vec3_extract(vec3 v, vec_index i) {
-  return _mm_cvtss_f32(_mm_shuffle_ps(v.raw, v.raw, i));
+  return v.raw[i];
 }
 make_vec_get(float, vec3, X);
 make_vec_get(float, vec3, Y);
@@ -589,7 +589,7 @@ static inline vec2 vec2_swizzle_2(vec2 v, vec_index x, vec_index y) {
 }
 /* last args are imm */
 static inline float vec2_extract(vec2 v, vec_index i) {
-  return _mm_cvtss_f32(_mm_shuffle_ps(_vec2_to_intrinsic(v), _vec2_to_intrinsic(v), i));
+  return _vec2_to_intrinsic(v)[i];
 }
 make_vec_get(float, vec2, X);
 make_vec_get(float, vec2, Y);
