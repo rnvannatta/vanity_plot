@@ -110,8 +110,6 @@ QueriedDevice score_gpu(VkPhysicalDevice device, VkSurfaceKHR surf) {
       suitable = false;
     }
 
-    printf("device %s scored %d\n", deviceProps.deviceName, score * suitable);
-
     return (QueriedDevice) { .dev = device,
       .score = score * suitable,
       .graphics_index = graphicsQueueIndex,
@@ -162,7 +160,6 @@ QueriedDevice VG_SelectPhysicalDevice(VGWindow * wind) {
   if(physicalDeviceCount == 0)
     return err_device;
 
-  printf("found %d devices\n", physicalDeviceCount);
   struct QueriedDevice scored_devices[physicalDeviceCount];
   for(uint32_t i = 0; i < physicalDeviceCount; i++) {
     scored_devices[i] = score_gpu(physicalDevices[i], wind->surface);
@@ -175,14 +172,13 @@ QueriedDevice VG_SelectPhysicalDevice(VGWindow * wind) {
   {
     VkPhysicalDeviceProperties deviceProps;
     vkGetPhysicalDeviceProperties(ret.dev, &deviceProps);
-    printf("selected device %s\n", deviceProps.deviceName);
   }
   return ret;
 }
 
 VGWindow * VG_CreateWindow(int w, int h) {
   VGWindow * wind = malloc(sizeof(VGWindow));
-  wind->window = SDL_CreateWindow("such vulkan much wow", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+  wind->window = SDL_CreateWindow("Vanity Plot", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
   uint32_t sdlExtensionCount;
   SDL_Vulkan_GetInstanceExtensions(wind->window, &sdlExtensionCount, NULL);
@@ -191,9 +187,6 @@ VGWindow * VG_CreateWindow(int w, int h) {
   const char* instanceExtensionNames[instanceExtensionCount];
   SDL_Vulkan_GetInstanceExtensions(wind->window, &sdlExtensionCount, instanceExtensionNames);
   instanceExtensionNames[sdlExtensionCount+0] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-
-  for(int i = 0; i < instanceExtensionCount; i++)
-    printf("%s\n", instanceExtensionNames[i]);
 
   const char * validation_layer = {
     "VK_LAYER_KHRONOS_validation"
@@ -209,7 +202,6 @@ VGWindow * VG_CreateWindow(int w, int h) {
     for(int i = 0; i < layerCount; i++) {
       if(!strcmp(availableLayers[i].layerName, validation_layer))
         found_validation = true;
-      printf("%s\n", availableLayers[i].layerName);
     }
   }
 
@@ -234,7 +226,7 @@ VGWindow * VG_CreateWindow(int w, int h) {
       default:
         reason = "unknown error";
     }
-    printf("failed to create instance: %s\n", reason);
+    fprintf(stderr, "failed to create instance: %s\n", reason);
     return NULL;
   }
 
@@ -256,7 +248,7 @@ VGWindow * VG_CreateWindow(int w, int h) {
   QueriedDevice queried_device = VG_SelectPhysicalDevice(wind);
   wind->physical_device = queried_device.dev;
   if(wind->physical_device == VK_NULL_HANDLE) {
-    printf("failed to find suitable device supporting vulkan\n");
+    fprintf(stderr, "failed to find suitable device supporting vulkan\n");
     return NULL;
   }
 
@@ -269,7 +261,7 @@ VGWindow * VG_CreateWindow(int w, int h) {
   while(!(msaa_samples & queried_device.msaa_samples))
     msaa_samples /= 2;
   if(!msaa_samples)
-    printf("no msaa support\n");
+    fprintf(stderr, "no msaa support\n");
   wind->msaa_samples = msaa_samples;
 
   float queuePriority = 1.0f;

@@ -459,17 +459,12 @@ static void read_cmds(VGWindow * wind, WindStatus * status, int pipe) {
   }
 }
 
-float min(float a, float b) {
+static float min(float a, float b) {
   return a < b ? a : b;
 }
 
-float max(float a, float b) {
+static float max(float a, float b) {
   return a >= b ? a : b;
-}
-static void swap(float * a, float * b) {
-  float tmp = *a;
-  *a = *b;
-  *b = tmp;
 }
 
 static void draw_cmds(VGWindow * win, OldskoolContext * osk) {

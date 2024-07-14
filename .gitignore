@@ -12,6 +12,7 @@ a.out
 *.swp
 *.swo
 *.swn
+*.scmh
 core
 .gdb_history
 
