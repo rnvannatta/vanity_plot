@@ -2,7 +2,11 @@
 
 A little repl-oriented plotting visualizer. It's useful for visualizing data while designing or debugging algorithms in a repl. The library is in C, with Vanity Scheme bindings.
 
-Example Usage in C:
+### Example Output
+
+![Example Output](https://github.com/rnvannatta/vanity_plot/blob/master/demo.png?raw=true)
+
+### Example Usage in C
 
 ```
 int main() {
@@ -19,7 +23,7 @@ int main() {
 }
 ```
 
-Example Usage in Vanity Scheme:
+### Example Usage in Vanity Scheme
 
 ```
 (import (vanity plot))
